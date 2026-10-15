@@ -5,9 +5,9 @@
     "@mgillmann"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/mgillmann/ha-solaredge-v2",
+  "documentation": "https://github.com/jeroenh/ha-solaredge-v2",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/mgillmann/ha-solaredge-v2/issues",
+  "issue_tracker": "https://github.com/jeroenh/ha-solaredge-v2/issues",
   "requirements": [],
   "version": "0.3.0"
 }
