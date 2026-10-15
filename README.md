@@ -19,7 +19,7 @@ A small custom integration that reads solar production from the **SolarEdge ONE 
 ## What you need first
 
 1. **Site ID.** It's shown in the SolarEdge monitoring portal (monitoring.solaredge.com).
-2. **An OAuth app** registered in the SolarEdge developer portal (<https://api-docs.solaredge.com/>). This gives you a **Client ID** and **Client Secret**. Write down the **redirect URI** you register.
+2. **An OAuth app** registered in the SolarEdge developer portal (<https://api-docs.solaredge.com/>). This gives you a **Client ID** and **Client Secret**. Set and write down a redirect URI such as `https://example.com/callback`. The script only needs the browser's redirected URL; it doesn't need a callback server. Use the exact same URI in the script.
 3. **A refresh token**, obtained once outside HA (next section).
 
 ## Getting the first refresh token
