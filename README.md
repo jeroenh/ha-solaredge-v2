@@ -24,6 +24,8 @@ A small custom integration that reads solar production from the **SolarEdge ONE 
 
 ## Getting the first refresh token
 
+**Inside Home Assistant (no script needed):** when adding the integration, enter your Site ID, Client ID, Client Secret, authorize endpoint URL and redirect URI, and leave *Refresh token* empty. The next step shows a login link; approve access, then paste the address you were redirected to. Re-authentication works the same way. The script below is only needed if you prefer to do it outside HA.
+
 Run one script; it prompts for everything it needs (Python 3 standard library only):
 
 ```bash

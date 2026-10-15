@@ -3,18 +3,22 @@
     "step": {
       "user": {
         "title": "SolarEdge ONE (v2 API)",
-        "description": "Enter your site ID and OAuth credentials. The refresh token must be obtained once outside Home Assistant, because SolarEdge does not return the OAuth state parameter that Home Assistant's built-in flow requires.",
+        "description": "Enter your site ID and OAuth app credentials. Next you will log in to SolarEdge in your browser and paste the address you are redirected to. (HA's built-in OAuth flow can't be used because SolarEdge does not return the OAuth state parameter.)",
         "data": {
           "site_id": "Site ID",
           "client_id": "Client ID",
           "client_secret": "Client secret",
-          "refresh_token": "Refresh token"
+          "refresh_token": "Refresh token (optional)",
+          "authorize_url": "Authorize endpoint URL",
+          "redirect_uri": "Redirect URI"
         },
         "data_description": {
           "site_id": "Shown in the SolarEdge monitoring portal.",
           "client_id": "OAuth client ID from your app in the SolarEdge developer portal.",
           "client_secret": "OAuth client secret from the same app.",
-          "refresh_token": "Obtained once outside Home Assistant (see the project README). SolarEdge issues a new one on every refresh and the integration stores it automatically."
+          "refresh_token": "Leave empty to log in through the browser. Only fill in if you already have one.",
+          "authorize_url": "From SolarEdge's homeowner and self-access guide.",
+          "redirect_uri": "Exactly the redirect URI registered with your OAuth app."
         }
       },
       "reauth_confirm": {
@@ -40,12 +44,22 @@
           "client_secret": "OAuth client secret from the same app.",
           "refresh_token": "Obtained once outside Home Assistant (see the project README). SolarEdge issues a new one on every refresh and the integration stores it automatically."
         }
+      },
+      "authorize": {
+        "title": "Approve access",
+        "description": "Open this link, log in and approve access: {url}\n\nYou will be redirected to your redirect URI (the page may fail to load). Copy the full address from the browser's address bar and paste it below.",
+        "data": {
+          "redirect_url": "Redirect URL (or code)"
+        }
       }
     },
     "abort": {
       "already_configured": "This SolarEdge site is already configured",
       "reauth_successful": "Re-authentication was successful",
       "reconfigure_successful": "Credentials updated"
+    },
+    "error": {
+      "exchange_failed": "SolarEdge rejected the code. Codes expire quickly; open the link again and paste the new address."
     }
   },
   "options": {
