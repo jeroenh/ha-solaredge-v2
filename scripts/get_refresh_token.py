@@ -6,33 +6,155 @@ authorization callback does not return the `state` parameter), so the first
 refresh token has to be obtained by hand. Run this right after approving
 access in the browser; authorization codes expire quickly.
 
-Usage:
+Guided (recommended) - prompts for anything not given, opens the browser,
+and accepts the full redirect URL you land on (the code is extracted for you):
+    python3 get_refresh_token.py
+
+Non-interactive, if you already have a code:
     python3 get_refresh_token.py \
         --client-id YOUR_CLIENT_ID \
         --client-secret YOUR_CLIENT_SECRET \
         --redirect-uri https://the.redirect/uri/registered/with/your/app \
         --code THE_CODE_FROM_THE_REDIRECT_URL
 
+Monitoring (for cron): SolarEdge rotates the refresh token on every use and the
+integration stores the newest one, so do NOT refresh the token from cron
+yourself - that would invalidate Home Assistant's copy. Instead check that the
+integration is still healthy through the Home Assistant REST API:
+    HA_TOKEN=long_lived_token python3 get_refresh_token.py --check-ha \
+        --ha-url http://homeassistant.local:8123 --entity sensor.solaredge_site_<SITEID>_energy_today
+It prints nothing and exits 0 when healthy; otherwise it prints how to replace
+the token and exits 1. Run with --print-cron for a ready-made crontab entry.
+
 Only the Python standard library is required.
 """
 import argparse
 import base64
+import getpass
 import json
+import os
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import webbrowser
 
 TOKEN_URL = "https://monitoringapi.solaredge.com/v2/oauth2/token"
 
 
+def ask(value, prompt, secret=False):
+    if value:
+        return value
+    return (getpass.getpass if secret else input)(f"{prompt}: ").strip()
+
+
+def extract_code(text: str) -> str:
+    """Accept either a bare code or a full redirect URL containing ?code=..."""
+    text = text.strip()
+    if "code=" in text:
+        query = urllib.parse.urlparse(text).query or text.split("?", 1)[-1]
+        codes = urllib.parse.parse_qs(query).get("code")
+        if codes:
+            return codes[0]
+    return text
+
+
+CRON_HELP = """\
+# crontab -e   (cron mails any output of a job to MAILTO; this check is silent when healthy)
+MAILTO=you@example.com
+HA_TOKEN=YOUR_HA_LONG_LIVED_ACCESS_TOKEN
+# Every 6 hours (night hours are normally "unavailable" only if you enabled sun-only polling,
+# today's totals are kept overnight so this is still fine):
+0 */6 * * * python3 {script} --check-ha --ha-url http://homeassistant.local:8123 --entity sensor.solaredge_site_SITEID_energy_today
+
+# Create HA_TOKEN in HA: Profile -> Security -> Long-lived access tokens.
+# The cron host needs a working local mailer (e.g. msmtp or postfix) for MAILTO.
+"""
+
+REPLACE_HELP = """\
+The SolarEdge integration looks unhealthy; its refresh token has probably expired or been revoked.
+To replace it:
+  1. python3 {script}        (guided: log in, approve, paste the redirect URL)
+  2. Home Assistant -> Settings -> Devices & Services -> SolarEdge ONE (v2 API)
+     -> Re-authenticate (or Reconfigure) and paste the new refresh token.
+"""
+
+
+def check_ha(args) -> int:
+    token = args.ha_token or os.environ.get("HA_TOKEN")
+    if not (token and args.ha_url and args.entity):
+        print("--check-ha needs --ha-url, --entity and HA_TOKEN (or --ha-token)", file=sys.stderr)
+        return 2
+    req = urllib.request.Request(
+        f"{args.ha_url.rstrip('/')}/api/states/{args.entity}",
+        headers={"Authorization": "Bearer " + token},
+    )
+    script = os.path.abspath(__file__)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            state = json.load(resp).get("state")
+    except (urllib.error.URLError, OSError) as err:
+        print(f"Could not query Home Assistant: {err}\n")
+        return 1
+    if state in ("unavailable", "unknown", None):
+        print(f"{args.entity} is '{state}'.\n")
+        print(REPLACE_HELP.format(script=script))
+        return 1
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--client-id", required=True)
-    parser.add_argument("--client-secret", required=True)
-    parser.add_argument("--redirect-uri", required=True)
-    parser.add_argument("--code", required=True)
+    parser.add_argument("--client-id")
+    parser.add_argument("--client-secret")
+    parser.add_argument("--redirect-uri")
+    parser.add_argument("--code", help="code or full redirect URL")
+    parser.add_argument(
+        "--authorize-url",
+        help="authorize endpoint from the SolarEdge developer guide "
+        "(only needed for the guided flow)",
+    )
+    parser.add_argument("--check-ha", action="store_true", help="health check for cron")
+    parser.add_argument("--ha-url", help="e.g. http://homeassistant.local:8123")
+    parser.add_argument("--ha-token", help="long-lived token (prefer env HA_TOKEN)")
+    parser.add_argument("--entity", help="e.g. sensor.solaredge_site_<SITEID>_energy_today")
+    parser.add_argument("--print-cron", action="store_true", help="show crontab suggestion")
     args = parser.parse_args()
+
+    if args.print_cron:
+        print(CRON_HELP.format(script=os.path.abspath(__file__)))
+        return 0
+    if args.check_ha:
+        return check_ha(args)
+
+    args.client_id = ask(args.client_id, "Client ID")
+    args.client_secret = ask(args.client_secret, "Client secret", secret=True)
+    args.redirect_uri = ask(args.redirect_uri, "Redirect URI registered with your app")
+
+    if not args.code:
+        authorize = ask(
+            args.authorize_url,
+            "Authorize endpoint URL (from the SolarEdge guide)",
+        )
+        sep = "&" if "?" in authorize else "?"
+        url = authorize + sep + urllib.parse.urlencode(
+            {
+                "response_type": "code",
+                "client_id": args.client_id,
+                "redirect_uri": args.redirect_uri,
+            }
+        )
+        print(f"\nOpening your browser. Log in and approve access:\n\n{url}\n")
+        webbrowser.open(url)
+        print(
+            "You will be redirected to your redirect URI (the page may fail to load).\n"
+            "Copy the full address from the browser's address bar and paste it here."
+        )
+        args.code = input("Redirect URL (or code): ")
+    args.code = extract_code(args.code)
+    if not args.code:
+        print("No code provided.", file=sys.stderr)
+        return 1
 
     basic = base64.b64encode(
         f"{args.client_id}:{args.client_secret}".encode()
@@ -67,6 +189,12 @@ def main() -> int:
         return 1
     print("Refresh token (paste this into Home Assistant):\n")
     print(refresh)
+    print(
+        "\nNext: paste it in Home Assistant (Re-authenticate/Reconfigure). Tokens are "
+        "rotated on every use by the integration, so keep this one private and do not "
+        "reuse it elsewhere.\nTip: run with --print-cron for a crontab that emails you "
+        "when the token needs replacing."
+    )
     return 0
 
 
