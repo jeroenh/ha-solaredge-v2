@@ -34,6 +34,16 @@ It asks for your Client ID, Client Secret, redirect URI and the authorize endpoi
 
 All values can also be passed as flags (`--client-id`, `--client-secret`, `--redirect-uri`, `--authorize-url`), or pass `--code` (a code or the full redirect URL) to skip the browser step.
 
+### Keeping the token alive (cron + email)
+
+The integration renews the token on every poll, so normally nothing is needed. The token can still expire or be revoked (e.g. HA was off for a long time). Do **not** refresh the token from cron yourself: SolarEdge rotates it on every use, so a second consumer would invalidate Home Assistant's copy. Instead, monitor HA and get emailed when it breaks:
+
+```bash
+python3 scripts/get_refresh_token.py --print-cron   # prints a crontab entry
+```
+
+It uses `--check-ha` (a Home Assistant long-lived access token + the `energy_today` entity). When the sensor is `unavailable`/`unknown` it prints replacement instructions and exits 1, and cron emails that output to `MAILTO`. To replace the token, rerun `python3 scripts/get_refresh_token.py` and paste the result into **Re-authenticate**.
+
 ## Installation
 
 ### HACS (custom repository)
