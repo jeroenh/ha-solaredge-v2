@@ -42,6 +42,12 @@ A small custom integration that reads solar production from the **SolarEdge ONE 
 
 ### HACS (custom repository)
 
+[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jeroenh&repository=ha-solaredge-v2&category=integration)
+
+Requires Home Assistant 2024.11.0 or newer and HACS. The button opens the repository in your HACS (you may need to set up My Home Assistant first); then click **Download**.
+
+Or manually:
+
 1. HACS → ⋮ → **Custom repositories** → add this repo's URL, category **Integration**.
 2. Install **SolarEdge ONE (v2 API)** and restart Home Assistant.
 
