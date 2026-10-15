@@ -24,19 +24,15 @@ A small custom integration that reads solar production from the **SolarEdge ONE 
 
 ## Getting the first refresh token
 
-1. Open SolarEdge's OAuth **authorize** URL in a browser with your client ID and redirect URI, then log in and approve access.
-2. You're redirected to your redirect URI. Copy the `code` value from the address bar (the page itself may fail to load; that's fine).
-3. Exchange the code for tokens straight away, because codes expire quickly:
+Run one script; it prompts for everything it needs (Python 3 standard library only):
 
-   ```bash
-   python3 scripts/get_refresh_token.py \
-     --client-id YOUR_CLIENT_ID \
-     --client-secret YOUR_CLIENT_SECRET \
-     --redirect-uri YOUR_REDIRECT_URI \
-     --code THE_CODE
-   ```
+```bash
+python3 scripts/get_refresh_token.py
+```
 
-   The script POSTs to `https://monitoringapi.solaredge.com/v2/oauth2/token` with `grant_type=authorization_code`, authenticating with HTTP Basic auth (`client_id:client_secret`), and prints the `refresh_token`.
+It asks for your Client ID, Client Secret, redirect URI and the authorize endpoint URL (listed in SolarEdge's [homeowner and self-access guide](https://api-docs.solaredge.com/docs/developer-platform/df8kx5j4z9vi0-homeowner-and-self-access-guide)). It then opens the browser for you to log in and approve. Afterwards, paste the **whole address** you were redirected to (the page itself may fail to load; that's fine) and the script extracts the code, exchanges it immediately and prints the refresh token to paste into Home Assistant.
+
+All values can also be passed as flags (`--client-id`, `--client-secret`, `--redirect-uri`, `--authorize-url`), or pass `--code` (a code or the full redirect URL) to skip the browser step.
 
 ## Installation
 
