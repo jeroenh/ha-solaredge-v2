@@ -24,7 +24,8 @@ integration is still healthy through the Home Assistant REST API:
     HA_TOKEN=long_lived_token python3 get_refresh_token.py --check-ha \
         --ha-url http://homeassistant.local:8123 --entity sensor.solaredge_site_<SITEID>_energy_today
 It prints nothing and exits 0 when healthy; otherwise it prints how to replace
-the token and exits 1. Run with --print-cron for a ready-made crontab entry.
+the token and exits 1. The guided flow ends by printing a ready-made crontab entry (the
+HA token is embedded as an argument); --print-cron prints one with placeholders.
 
 Only the Python standard library is required.
 """
@@ -33,6 +34,7 @@ import base64
 import getpass
 import json
 import os
+import shlex
 import sys
 import urllib.error
 import urllib.parse
@@ -59,17 +61,26 @@ def extract_code(text: str) -> str:
     return text
 
 
-CRON_HELP = """\
+CRON_TEMPLATE = """\
 # crontab -e   (cron mails any output of a job to MAILTO; this check is silent when healthy)
-MAILTO=you@example.com
-HA_TOKEN=YOUR_HA_LONG_LIVED_ACCESS_TOKEN
-# Every 6 hours (night hours are normally "unavailable" only if you enabled sun-only polling,
-# today's totals are kept overnight so this is still fine):
-0 */6 * * * python3 {script} --check-ha --ha-url http://homeassistant.local:8123 --entity sensor.solaredge_site_SITEID_energy_today
+MAILTO={mailto}
+# Every 6 hours:
+0 */6 * * * python3 {script} --check-ha --ha-url {ha_url} --ha-token {ha_token} --entity sensor.solaredge_site_{site_id}_energy_today
 
-# Create HA_TOKEN in HA: Profile -> Security -> Long-lived access tokens.
+# Create the HA token in HA: Profile -> Security -> Long-lived access tokens.
 # The cron host needs a working local mailer (e.g. msmtp or postfix) for MAILTO.
 """
+
+
+def build_cron(site_id, ha_url, ha_token, mailto):
+    return CRON_TEMPLATE.format(
+        mailto=mailto or "you@example.com",
+        script=shlex.quote(os.path.abspath(__file__)),
+        ha_url=shlex.quote(ha_url),
+        ha_token=shlex.quote(ha_token or "YOUR_HA_LONG_LIVED_ACCESS_TOKEN"),
+        site_id=site_id or "SITEID",
+    )
+
 
 REPLACE_HELP = """\
 The SolarEdge integration looks unhealthy; its refresh token has probably expired or been revoked.
@@ -118,15 +129,25 @@ def main() -> int:
     parser.add_argument("--ha-url", help="e.g. http://homeassistant.local:8123")
     parser.add_argument("--ha-token", help="long-lived token (prefer env HA_TOKEN)")
     parser.add_argument("--entity", help="e.g. sensor.solaredge_site_<SITEID>_energy_today")
+    parser.add_argument("--site-id", help="SolarEdge site ID")
+    parser.add_argument("--mailto", help="email address for cron output")
     parser.add_argument("--print-cron", action="store_true", help="show crontab suggestion")
     args = parser.parse_args()
 
     if args.print_cron:
-        print(CRON_HELP.format(script=os.path.abspath(__file__)))
+        print(
+            build_cron(
+                args.site_id,
+                args.ha_url or "http://homeassistant.local:8123",
+                args.ha_token,
+                args.mailto,
+            )
+        )
         return 0
     if args.check_ha:
         return check_ha(args)
 
+    args.site_id = ask(args.site_id, "Site ID")
     args.client_id = ask(args.client_id, "Client ID")
     args.client_secret = ask(args.client_secret, "Client secret", secret=True)
     args.redirect_uri = ask(args.redirect_uri, "Redirect URI registered with your app")
@@ -187,14 +208,30 @@ def main() -> int:
     if not refresh:
         print(f"No refresh_token in response: {tokens}", file=sys.stderr)
         return 1
-    print("Refresh token (paste this into Home Assistant):\n")
-    print(refresh)
+    print("\nValues to paste into Home Assistant (Re-authenticate/Reconfigure):\n")
+    print(f"  Site ID:        {args.site_id}")
+    print(f"  Client ID:      {args.client_id}")
+    print(f"  Client secret:  {args.client_secret}")
+    print(f"  Refresh token:  {refresh}")
     print(
-        "\nNext: paste it in Home Assistant (Re-authenticate/Reconfigure). Tokens are "
-        "rotated on every use by the integration, so keep this one private and do not "
-        "reuse it elsewhere.\nTip: run with --print-cron for a crontab that emails you "
-        "when the token needs replacing."
+        "\nKeep these private; the integration rotates the refresh token on every use, "
+        "so do not reuse it elsewhere."
     )
+
+    print("\nNow let's generate a crontab that emails you when the token needs replacing.")
+    ha_url = input("Home Assistant URL [http://homeassistant.local:8123]: ").strip()
+    ha_token = getpass.getpass("HA long-lived access token (empty to skip): ").strip()
+    if ha_token:
+        mailto = input("Email for alerts [you@example.com]: ").strip()
+        print("\nAdd this with `crontab -e`:\n")
+        print(
+            build_cron(
+                args.site_id,
+                ha_url or "http://homeassistant.local:8123",
+                ha_token,
+                mailto,
+            )
+        )
     return 0
 
 
