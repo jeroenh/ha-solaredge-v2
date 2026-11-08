@@ -42,7 +42,7 @@ import urllib.request
 import webbrowser
 
 TOKEN_URL = "https://monitoringapi.solaredge.com/v2/oauth2/token"
-AUTHORIZE_URL = "https://monitoringapi.solaredge.com/v2/sites"
+AUTHORIZE_URL = "https://monitoringapi.solaredge.com/v2/oauth2/authorize"
 
 
 def ask(value, prompt, secret=False):
