@@ -30,9 +30,9 @@ Run one script; it prompts for everything it needs (Python 3 standard library on
 python3 scripts/get_refresh_token.py
 ```
 
-It asks for your Client ID, Client Secret, redirect URI and the authorize endpoint URL (listed in SolarEdge's [homeowner and self-access guide](https://api-docs.solaredge.com/docs/developer-platform/df8kx5j4z9vi0-homeowner-and-self-access-guide)). It then opens the browser for you to log in and approve. Afterwards, paste the **whole address** you were redirected to (the page itself may fail to load; that's fine) and the script extracts the code, exchanges it immediately and prints the refresh token to paste into Home Assistant.
+It asks for your Client ID, Client Secret and redirect URI, then opens the SolarEdge URL with a 24-month access duration for you to log in and approve. Afterwards, paste the **whole address** you were redirected to (the page itself may fail to load; that's fine) and the script extracts the code, exchanges it immediately and prints the refresh token to paste into Home Assistant.
 
-All values can also be passed as flags (`--client-id`, `--client-secret`, `--redirect-uri`, `--authorize-url`), or pass `--code` (a code or the full redirect URL) to skip the browser step.
+Values can also be passed as flags (`--client-id`, `--client-secret`, `--redirect-uri`), or pass `--code` (a code or the full redirect URL) to skip the browser step.
 
 ### Keeping the token alive (cron + email)
 
