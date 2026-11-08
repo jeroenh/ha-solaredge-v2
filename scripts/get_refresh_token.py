@@ -42,6 +42,7 @@ import urllib.request
 import webbrowser
 
 TOKEN_URL = "https://monitoringapi.solaredge.com/v2/oauth2/token"
+AUTHORIZE_URL = "https://monitoringapi.solaredge.com/v2/sites"
 
 
 def ask(value, prompt, secret=False):
@@ -120,11 +121,6 @@ def main() -> int:
     parser.add_argument("--client-secret")
     parser.add_argument("--redirect-uri")
     parser.add_argument("--code", help="code or full redirect URL")
-    parser.add_argument(
-        "--authorize-url",
-        help="authorize endpoint from the SolarEdge developer guide "
-        "(only needed for the guided flow)",
-    )
     parser.add_argument("--check-ha", action="store_true", help="health check for cron")
     parser.add_argument("--ha-url", help="e.g. http://homeassistant.local:8123")
     parser.add_argument("--ha-token", help="long-lived token (prefer env HA_TOKEN)")
@@ -153,16 +149,14 @@ def main() -> int:
     args.redirect_uri = ask(args.redirect_uri, "Redirect URI registered with your app")
 
     if not args.code:
-        authorize = ask(
-            args.authorize_url,
-            "Authorize endpoint URL (from the SolarEdge guide)",
-        )
+        authorize = AUTHORIZE_URL
         sep = "&" if "?" in authorize else "?"
         url = authorize + sep + urllib.parse.urlencode(
             {
                 "response_type": "code",
                 "client_id": args.client_id,
                 "redirect_uri": args.redirect_uri,
+                "access_duration": 24,
             }
         )
         print(f"\nOpening your browser. Log in and approve access:\n\n{url}\n")
