@@ -51,6 +51,29 @@ def ask(value, prompt, secret=False):
     return (getpass.getpass if secret else input)(f"{prompt}: ").strip()
 
 
+def read_credentials():
+    """Read SolarEdge credentials from the project-root .env file."""
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    credentials = {}
+    try:
+        with open(env_path, encoding="utf-8") as env_file:
+            for line in env_file:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("export "):
+                    line = line[7:].lstrip()
+                key, separator, value = line.partition("=")
+                if separator and key.strip() in ("CLIENT_ID", "CLIENT_SECRET"):
+                    value = value.strip()
+                    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+                        value = value[1:-1]
+                    credentials[key.strip()] = value
+    except FileNotFoundError:
+        pass
+    return credentials
+
+
 def extract_code(text: str) -> str:
     """Accept either a bare code or a full redirect URL containing ?code=..."""
     text = text.strip()
@@ -143,9 +166,17 @@ def main() -> int:
     if args.check_ha:
         return check_ha(args)
 
+    credentials = read_credentials()
     args.site_id = ask(args.site_id, "Site ID")
-    args.client_id = ask(args.client_id, "Client ID")
-    args.client_secret = ask(args.client_secret, "Client secret", secret=True)
+    args.client_id = ask(
+        args.client_id or os.environ.get("CLIENT_ID") or credentials.get("CLIENT_ID"),
+        "Client ID",
+    )
+    args.client_secret = ask(
+        args.client_secret or os.environ.get("CLIENT_SECRET") or credentials.get("CLIENT_SECRET"),
+        "Client secret",
+        secret=True,
+    )
     args.redirect_uri = ask(args.redirect_uri, "Redirect URI registered with your app")
 
     if not args.code:

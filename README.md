@@ -24,13 +24,15 @@ A small custom integration that reads solar production from the **SolarEdge ONE 
 
 ## Getting the first refresh token
 
-Run one script; it prompts for everything it needs (Python 3 standard library only):
+Run one script; it prompts for anything not already provided (Python 3 standard library only):
 
 ```bash
 python3 scripts/get_refresh_token.py
 ```
 
-It asks for your Client ID, Client Secret and redirect URI, then opens the SolarEdge URL with a 24-month access duration for you to log in and approve. Afterwards, paste the **whole address** you were redirected to (the page itself may fail to load; that's fine) and the script extracts the code, exchanges it immediately and prints the refresh token to paste into Home Assistant.
+If you downloaded the SolarEdge credentials as a `.env` file, place it in the repository root; the script reads `CLIENT_ID` and `CLIENT_SECRET` from it automatically. The file is ignored by Git. Explicit `--client-id`/`--client-secret` options and matching environment variables take precedence over the file.
+
+The script asks for your Site ID and redirect URI, then opens the SolarEdge URL with a 24-month access duration for you to log in and approve. Afterwards, paste the **whole address** you were redirected to (the page itself may fail to load; that's fine) and the script extracts the code, exchanges it immediately and prints the refresh token to paste into Home Assistant.
 
 Values can also be passed as flags (`--client-id`, `--client-secret`, `--redirect-uri`), or pass `--code` (a code or the full redirect URL) to skip the browser step.
 
