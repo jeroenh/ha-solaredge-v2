@@ -19,11 +19,15 @@
       },
       "reauth_confirm": {
         "title": "Re-authenticate SolarEdge",
-        "description": "SolarEdge rejected the stored token. Get a new refresh token (see the project README) and paste it here.",
+        "description": "SolarEdge rejected the stored credentials. Enter the client ID and secret, and get a new refresh token for that client (see the project README).",
         "data": {
+          "client_id": "Client ID",
+          "client_secret": "Client secret",
           "refresh_token": "Refresh token"
         },
         "data_description": {
+          "client_id": "OAuth client ID from your app in the SolarEdge developer portal.",
+          "client_secret": "OAuth client secret from the same app.",
           "refresh_token": "Obtained once outside Home Assistant (see the project README). SolarEdge issues a new one on every refresh and the integration stores it automatically."
         }
       },
@@ -41,6 +45,10 @@
           "refresh_token": "Obtained once outside Home Assistant (see the project README). SolarEdge issues a new one on every refresh and the integration stores it automatically."
         }
       }
+    },
+    "error": {
+      "invalid_auth": "SolarEdge rejected the credentials. Check the client ID, client secret, and refresh token.",
+      "cannot_connect": "Could not validate the credentials with SolarEdge. Try again later."
     },
     "abort": {
       "already_configured": "This SolarEdge site is already configured",

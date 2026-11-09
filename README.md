@@ -44,7 +44,7 @@ The integration renews the token on every poll, so normally nothing is needed. T
 python3 scripts/get_refresh_token.py --print-cron   # prints a crontab entry
 ```
 
-It uses `--check-ha` (a Home Assistant long-lived access token + the `energy_today` entity). When the sensor is `unavailable`/`unknown` it prints replacement instructions and exits 1, and cron emails that output to `MAILTO`. To replace the token, rerun `python3 scripts/get_refresh_token.py` and paste the result into **Re-authenticate**.
+It uses `--check-ha` (a Home Assistant long-lived access token + the `energy_today` entity). When the sensor is `unavailable`/`unknown` it prints replacement instructions and exits 1, and cron emails that output to `MAILTO`. To replace the token, rerun `python3 scripts/get_refresh_token.py` with your current OAuth client credentials and enter the result and those credentials into **Re-authenticate**.
 
 ## Installation
 
@@ -78,9 +78,9 @@ Open **Settings → Devices & Services → SolarEdge ONE (v2 API)**:
   - **Update interval**: minutes between API calls, 15–240 (default 30). The data has 15-minute resolution, so polling faster gains nothing.
   - **Only poll while the sun is up**: skips API calls between sunset and sunrise to save credits. Today's totals are kept overnight and reset at midnight. This lets you poll every 15 minutes during the day and still stay within the free tier.
 - **⋮ → Reconfigure**: replace the Client ID, Client Secret and refresh token without removing the integration.
-- **Re-authenticate**: if SolarEdge rejects the stored token, HA shows a repair notice. Paste a new refresh token there.
+- **Re-authenticate**: if SolarEdge rejects the stored credentials, HA shows a repair notice. Enter the Client ID, Client Secret and a new refresh token obtained for that client. You can enter a replacement client ID and secret if the OAuth app was regenerated.
 
-Changes to the polling options apply immediately; no restart needed.
+Re-authentication and reconfiguration validate the credentials with SolarEdge before saving them. Validation consumes the supplied refresh token; the integration stores the replacement token returned by SolarEdge. Changes to the polling options apply immediately; no restart needed.
 
 ### Energy dashboard
 
@@ -98,7 +98,7 @@ See [`examples/automation_api_stale.yaml`](examples/automation_api_stale.yaml). 
 
 - **SolarEdge issues a new refresh token every time the old one is used.** The integration saves the new token back to its config entry after each refresh. If you write your own client and skip this, it stops working after the first refresh.
 - **Credit budget.** The free tier allows about 2,000 API credits per month. Each update is one call to `/v2/sites/{siteId}/power`, which returns the whole day in 15-minute steps, so current power, today's energy and today's peak all come from one request. The default of every **30 minutes** is about 1,440 calls a month. Every 15 minutes all day (about 2,900) goes over the limit and you'll start seeing 429 errors, unless you also turn on **Only poll while the sun is up**.
-- **If authentication breaks** (401 errors, or the token refresh fails), HA flags the integration as needing re-authentication. Get a new refresh token using the steps above and paste it into the re-authenticate prompt.
+- **If authentication breaks** (401 errors, or SolarEdge rejects a token refresh), HA flags the integration as needing re-authentication. Get a new refresh token using the steps above and enter it with the corresponding client ID and secret in the re-authenticate prompt.
 - **Not needed:** an entry under Application Credentials, or the old built-in `solaredge` integration. Remove any left over from earlier attempts.
 
 ## Debug logging

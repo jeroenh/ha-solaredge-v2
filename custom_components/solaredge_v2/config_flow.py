@@ -19,6 +19,7 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.core import callback
+from homeassistant.helpers import aiohttp_client
 from homeassistant.helpers.selector import (
     BooleanSelector,
     NumberSelector,
@@ -29,12 +30,11 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
+from .auth import InvalidAuth, TokenExchangeError, async_refresh_token
 from .const import (
-    CONF_ACCESS_TOKEN,
     CONF_CLIENT_ID,
     CONF_CLIENT_SECRET,
     CONF_DAYLIGHT_ONLY,
-    CONF_EXPIRES_AT,
     CONF_REFRESH_TOKEN,
     CONF_SCAN_INTERVAL,
     CONF_SITE_ID,
@@ -55,9 +55,6 @@ SCHEMA = vol.Schema(
         vol.Required(CONF_REFRESH_TOKEN): SECRET,
     }
 )
-
-# A new refresh token makes any cached access token stale.
-CLEAR_TOKENS = {CONF_ACCESS_TOKEN: None, CONF_EXPIRES_AT: 0}
 
 
 class SolarEdgeV2ConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -93,35 +90,52 @@ class SolarEdgeV2ConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Ask for a fresh refresh token."""
-        if user_input is None:
-            return self.async_show_form(
-                step_id="reauth_confirm",
-                data_schema=vol.Schema({vol.Required(CONF_REFRESH_TOKEN): SECRET}),
-            )
-        return self.async_update_reload_and_abort(
-            self._get_reauth_entry(), data_updates={**user_input, **CLEAR_TOKENS}
+        """Validate and replace the OAuth credentials."""
+        return await self._async_credentials_step(
+            "reauth_confirm", self._get_reauth_entry(), user_input
         )
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Change the OAuth credentials without removing the integration."""
-        entry = self._get_reconfigure_entry()
-        if user_input is None:
-            schema = vol.Schema(
-                {
-                    vol.Required(
-                        CONF_CLIENT_ID, default=entry.data[CONF_CLIENT_ID]
-                    ): str,
-                    vol.Required(CONF_CLIENT_SECRET): SECRET,
-                    vol.Required(CONF_REFRESH_TOKEN): SECRET,
-                }
-            )
-            return self.async_show_form(step_id="reconfigure", data_schema=schema)
-        return self.async_update_reload_and_abort(
-            entry, data_updates={**user_input, **CLEAR_TOKENS}
+        return await self._async_credentials_step(
+            "reconfigure", self._get_reconfigure_entry(), user_input
         )
+
+    async def _async_credentials_step(
+        self,
+        step_id: str,
+        entry: ConfigEntry,
+        user_input: dict[str, Any] | None,
+    ) -> ConfigFlowResult:
+        """Validate credentials before updating an existing entry."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                tokens = await async_refresh_token(
+                    aiohttp_client.async_get_clientsession(self.hass), user_input
+                )
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except TokenExchangeError:
+                errors["base"] = "cannot_connect"
+            else:
+                return self.async_update_reload_and_abort(
+                    entry, data_updates={**user_input, **tokens}
+                )
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_CLIENT_ID,
+                    default=(user_input or entry.data)[CONF_CLIENT_ID],
+                ): str,
+                vol.Required(CONF_CLIENT_SECRET): SECRET,
+                vol.Required(CONF_REFRESH_TOKEN): SECRET,
+            }
+        )
+        return self.async_show_form(step_id=step_id, data_schema=schema, errors=errors)
 
 
 class SolarEdgeV2OptionsFlow(OptionsFlow):

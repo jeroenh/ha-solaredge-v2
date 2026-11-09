@@ -1,7 +1,6 @@
 """The SolarEdge ONE (v2 API) integration."""
 from __future__ import annotations
 
-import base64
 import logging
 import time
 from datetime import timedelta
@@ -18,21 +17,18 @@ from homeassistant.helpers.sun import is_up
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .auth import InvalidAuth, TokenExchangeError, async_refresh_token
 from .const import (
     API_BASE,
     CONF_ACCESS_TOKEN,
-    CONF_CLIENT_ID,
-    CONF_CLIENT_SECRET,
     CONF_DAYLIGHT_ONLY,
     CONF_EXPIRES_AT,
-    CONF_REFRESH_TOKEN,
     CONF_SCAN_INTERVAL,
     CONF_SITE_ID,
     DEFAULT_DAYLIGHT_ONLY,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     TOKEN_EXPIRY_MARGIN,
-    TOKEN_URL,
 )
 
 EMPTY_DAY: dict[str, Any] = {
@@ -79,40 +75,16 @@ class SolarEdgeV2Coordinator(DataUpdateCoordinator[dict[str, Any]]):
         if token and time.time() < expires_at - TOKEN_EXPIRY_MARGIN:
             return token
 
-        basic = base64.b64encode(
-            f"{data[CONF_CLIENT_ID]}:{data[CONF_CLIENT_SECRET]}".encode()
-        ).decode()
         try:
-            async with self._session.post(
-                TOKEN_URL,
-                data={
-                    "grant_type": "refresh_token",
-                    "refresh_token": data[CONF_REFRESH_TOKEN],
-                },
-                headers={
-                    "Authorization": f"Basic {basic}",
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Accept": "application/json",
-                },
-            ) as resp:
-                body = await resp.json()
-                if resp.status != 200:
-                    raise ConfigEntryAuthFailed(
-                        f"Token refresh failed ({resp.status}): {body}"
-                    )
-        except aiohttp.ClientError as err:
+            tokens = await async_refresh_token(self._session, data)
+        except InvalidAuth as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+        except TokenExchangeError as err:
             raise UpdateFailed(f"Token refresh error: {err}") from err
 
-        new = {
-            **data,
-            CONF_ACCESS_TOKEN: body["access_token"],
-            CONF_EXPIRES_AT: time.time() + body.get("expires_in", 7200),
-        }
-        if body.get("refresh_token"):
-            new[CONF_REFRESH_TOKEN] = body["refresh_token"]
-        self.hass.config_entries.async_update_entry(self.entry, data=new)
-        _LOGGER.debug("SolarEdge token refreshed; expires in %ss", body.get("expires_in"))
-        return body["access_token"]
+        self.hass.config_entries.async_update_entry(self.entry, data={**data, **tokens})
+        _LOGGER.debug("SolarEdge token refreshed")
+        return tokens[CONF_ACCESS_TOKEN]
 
     async def _async_update_data(self) -> dict[str, Any]:
         today = dt_util.now().date()
